@@ -26,8 +26,61 @@ export interface HoldAdvice {
 
 const UPPER_SET = new Set<Category>(UPPER_CATEGORIES);
 
+/** Number of distinct 5-dice multisets (stars-and-bars). */
+export const HAND_COUNT = 252;
+
+const FACT = [1, 1, 2, 6, 24, 120];
+
+/** All 252 non-decreasing 5-die hands, index = packed id. */
+const ALL_HANDS: DieValue[][] = [];
+/** Map "1,2,3,4,5" → hand id 0..251 */
+const HAND_ID_BY_KEY = new Map<string, number>();
+
+(function buildHandIndex() {
+  for (let a = 1; a <= 6; a++) {
+    for (let b = a; b <= 6; b++) {
+      for (let c = b; c <= 6; c++) {
+        for (let d = c; d <= 6; d++) {
+          for (let e = d; e <= 6; e++) {
+            const hand: DieValue[] = [
+              a as DieValue,
+              b as DieValue,
+              c as DieValue,
+              d as DieValue,
+              e as DieValue,
+            ];
+            const id = ALL_HANDS.length;
+            ALL_HANDS.push(hand);
+            HAND_ID_BY_KEY.set(hand.join(","), id);
+          }
+        }
+      }
+    }
+  }
+})();
+
 function isUpper(cat: Category): cat is UpperCategory {
   return UPPER_SET.has(cat);
+}
+
+function multinomial(counts: number[]): number {
+  let n = 0;
+  let denom = 1;
+  for (const c of counts) {
+    n += c;
+    denom *= FACT[c]!;
+  }
+  return FACT[n]! / denom;
+}
+
+/** Pack a 5-die roll (any order) into hand id 0..251. */
+export function handId(dice: readonly DieValue[]): number {
+  const sorted = [...dice].sort((x, y) => x - y);
+  return HAND_ID_BY_KEY.get(sorted.join(",")) ?? 0;
+}
+
+export function handFromId(id: number): DieValue[] {
+  return ALL_HANDS[id]!.slice() as DieValue[];
 }
 
 /** Immediate turn value of scoring `category` with `dice`. */
@@ -63,8 +116,13 @@ export function bestImmediateScore(
   return best;
 }
 
-function diceKey(dice: readonly DieValue[]): string {
-  return [...dice].sort((a, b) => a - b).join(",");
+/** Per-sheet LUT: handId → best immediate score. */
+function buildScoreLut(sheet: ScoreSheet): Float64Array {
+  const lut = new Float64Array(HAND_COUNT);
+  for (let id = 0; id < HAND_COUNT; id++) {
+    lut[id] = bestImmediateScore(ALL_HANDS[id]!, sheet);
+  }
+  return lut;
 }
 
 function heldFacesOf(dice: DieValue[], held: boolean[]): DieValue[] {
@@ -95,8 +153,22 @@ export function allHoldMasks(): boolean[][] {
 }
 
 /**
+ * Unique keep actions for this dice layout (one mask per kept-face multiset).
+ */
+function uniqueHoldMasks(dice: DieValue[]): { mask: boolean[]; faces: DieValue[]; key: string }[] {
+  const seen = new Map<string, { mask: boolean[]; faces: DieValue[]; key: string }>();
+  for (const mask of allHoldMasks()) {
+    const faces = heldFacesOf(dice, mask);
+    const key = faces.join(",") || "none";
+    if (!seen.has(key)) seen.set(key, { mask: [...mask], faces, key });
+  }
+  return [...seen.values()];
+}
+
+/**
  * Enumerate every outcome of rolling unheld dice (held faces stay fixed).
  * Yields the resulting five-die array for each of 6^k outcomes (uniform).
+ * Kept for tests / debugging; hot path uses weighted multisets.
  */
 export function forEachRerollOutcome(
   dice: DieValue[],
@@ -126,43 +198,90 @@ export function forEachRerollOutcome(
   return total;
 }
 
-function expectedAfterHold(
+/**
+ * For a keep mask, visit each distinct resulting multiset with its outcome weight.
+ * Weight = number of microstates; weights sum to 6^k (k = free dice).
+ */
+function forEachWeightedReroll(
   dice: DieValue[],
   held: boolean[],
-  sheet: ScoreSheet,
-  rollsAfterThis: number,
-  memo: Map<string, number>,
+  visit: (nextId: number, weight: number) => void,
 ): number {
-  let sum = 0;
-  const count = forEachRerollOutcome(dice, held, (next) => {
-    sum += turnValue(next, sheet, rollsAfterThis, memo);
-  });
-  return sum / count;
+  const keptCounts = [0, 0, 0, 0, 0, 0, 0];
+  let free = 0;
+  for (let i = 0; i < 5; i++) {
+    if (held[i]) keptCounts[dice[i]!]! += 1;
+    else free += 1;
+  }
+  if (free === 0) {
+    visit(handId(dice), 1);
+    return 1;
+  }
+
+  const total = 6 ** free;
+  const rollCounts = [0, 0, 0, 0, 0, 0, 0];
+
+  function rec(face: number, left: number): void {
+    if (face === 6) {
+      rollCounts[6] = left;
+      const hand: DieValue[] = [];
+      for (let f = 1; f <= 6; f++) {
+        const n = keptCounts[f]! + rollCounts[f]!;
+        for (let i = 0; i < n; i++) hand.push(f as DieValue);
+      }
+      visit(handId(hand), multinomial(rollCounts.slice(1)));
+      return;
+    }
+    for (let n = 0; n <= left; n++) {
+      rollCounts[face] = n;
+      rec(face + 1, left - n);
+    }
+  }
+
+  rec(1, free);
+  return total;
 }
 
-/**
- * Expected score from this dice state with `rollsLeft` further rolls available
- * (same meaning as TurnState.rollsLeft after the current faces are known).
- */
-function turnValue(
-  dice: DieValue[],
-  sheet: ScoreSheet,
-  rollsLeft: number,
-  memo: Map<string, number>,
-): number {
-  if (rollsLeft <= 0) return bestImmediateScore(dice, sheet);
+type EvalCtx = {
+  lut: Float64Array;
+  /** turnValue memo: handId * 3 + rollsLeft → EV */
+  memo: Float64Array;
+  /** bitset: whether memo filled (rollsLeft 0..2) */
+  memoSet: Uint8Array;
+};
 
-  const key = `${diceKey(dice)}|${rollsLeft}`;
-  const cached = memo.get(key);
-  if (cached !== undefined) return cached;
+function turnValueId(hand: number, rollsLeft: number, ctx: EvalCtx): number {
+  if (rollsLeft <= 0) return ctx.lut[hand]!;
 
-  let best = bestImmediateScore(dice, sheet);
-  for (const held of allHoldMasks()) {
-    const ev = expectedAfterHold(dice, held, sheet, rollsLeft - 1, memo);
+  const slot = hand * 3 + rollsLeft;
+  if (ctx.memoSet[slot]) return ctx.memo[slot]!;
+
+  const dice = ALL_HANDS[hand]!;
+  let best = ctx.lut[hand]!;
+
+  for (const { mask } of uniqueHoldMasks(dice)) {
+    const ev = expectedAfterHoldId(dice, mask, rollsLeft - 1, ctx);
     if (ev > best) best = ev;
   }
-  memo.set(key, best);
+
+  ctx.memo[slot] = best;
+  ctx.memoSet[slot] = 1;
   return best;
+}
+
+function expectedAfterHoldId(
+  dice: DieValue[],
+  held: boolean[],
+  rollsAfterThis: number,
+  ctx: EvalCtx,
+): number {
+  let sum = 0;
+  let totalWeight = 0;
+  forEachWeightedReroll(dice, held, (nextId, weight) => {
+    sum += turnValueId(nextId, rollsAfterThis, ctx) * weight;
+    totalWeight += weight;
+  });
+  return totalWeight === 0 ? 0 : sum / totalWeight;
 }
 
 /**
@@ -180,24 +299,24 @@ export function rankHoldMoves(
 ): HoldAdvice[] {
   if (dice.length !== 5 || rollsLeft <= 0) return [];
 
-  const memo = new Map<string, number>();
+  const lut = buildScoreLut(sheet);
+  const ctx: EvalCtx = {
+    lut,
+    memo: new Float64Array(HAND_COUNT * 3),
+    memoSet: new Uint8Array(HAND_COUNT * 3),
+  };
+
+  // Seed memo for rollsLeft === 0 via lut (handled in turnValueId).
+
   const byFaceKey = new Map<string, HoldAdvice>();
 
-  for (const heldMask of allHoldMasks()) {
-    const expected = expectedAfterHold(
-      dice,
-      heldMask,
-      sheet,
-      rollsLeft - 1,
-      memo,
-    );
-    const heldFaces = heldFacesOf(dice, heldMask);
-    const key = holdFaceKey(dice, heldMask);
+  for (const { mask, faces, key } of uniqueHoldMasks(dice)) {
+    const expected = expectedAfterHoldId(dice, mask, rollsLeft - 1, ctx);
     const prev = byFaceKey.get(key);
     if (!prev || expected > prev.expected) {
       byFaceKey.set(key, {
-        heldMask: [...heldMask],
-        heldFaces,
+        heldMask: mask,
+        heldFaces: faces,
         expected,
       });
     }
