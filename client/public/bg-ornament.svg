@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" fill="none">
+  <!-- Spider web — center hub -->
+  <g stroke="#1a0f0a" stroke-linecap="round" stroke-linejoin="round" opacity="0.45">
+    <!-- Concentric rings -->
+    <circle cx="500" cy="500" r="55" stroke-width="1.2"/>
+    <circle cx="500" cy="500" r="120" stroke-width="1.15"/>
+    <circle cx="500" cy="500" r="195" stroke-width="1.15"/>
+    <circle cx="500" cy="500" r="280" stroke-width="1.2"/>
+    <circle cx="500" cy="500" r="375" stroke-width="1.25"/>
+    <circle cx="500" cy="500" r="480" stroke-width="1.3"/>
+
+    <!-- Radial threads (16 directions) -->
+    <path d="M500 500 L500 20" stroke-width="1.2"/>
+    <path d="M500 500 L500 980" stroke-width="1.2"/>
+    <path d="M500 500 L20 500" stroke-width="1.2"/>
+    <path d="M500 500 L980 500" stroke-width="1.2"/>
+    <path d="M500 500 L160 160" stroke-width="1.15"/>
+    <path d="M500 500 L840 160" stroke-width="1.15"/>
+    <path d="M500 500 L160 840" stroke-width="1.15"/>
+    <path d="M500 500 L840 840" stroke-width="1.15"/>
+    <path d="M500 500 L290 55" stroke-width="1.1"/>
+    <path d="M500 500 L710 55" stroke-width="1.1"/>
+    <path d="M500 500 L290 945" stroke-width="1.1"/>
+    <path d="M500 500 L710 945" stroke-width="1.1"/>
+    <path d="M500 500 L55 290" stroke-width="1.1"/>
+    <path d="M500 500 L945 290" stroke-width="1.1"/>
+    <path d="M500 500 L55 710" stroke-width="1.1"/>
+    <path d="M500 500 L945 710" stroke-width="1.1"/>
+  </g>
+
+  <!-- Slightly irregular silk strands for organic feel -->
+  <g stroke="#2a1810" stroke-linecap="round" fill="none" opacity="0.28">
+    <path d="M500 445 C530 470, 560 455, 575 430" stroke-width="0.9"/>
+    <path d="M555 500 C575 535, 555 575, 520 590" stroke-width="0.9"/>
+    <path d="M500 555 C460 575, 425 555, 415 520" stroke-width="0.9"/>
+    <path d="M445 500 C420 460, 445 420, 480 410" stroke-width="0.9"/>
+    <path d="M620 380 C660 420, 690 470, 700 520" stroke-width="1"/>
+    <path d="M380 620 C420 660, 470 690, 520 700" stroke-width="1"/>
+    <path d="M380 380 C340 420, 310 470, 300 520" stroke-width="1"/>
+    <path d="M620 620 C660 580, 690 530, 700 480" stroke-width="1"/>
+  </g>
+
+  <!-- Soft gold highlight threads (very subtle) -->
+  <g stroke="#c9a227" stroke-linecap="round" fill="none" opacity="0.18">
+    <circle cx="500" cy="500" r="195" stroke-width="0.8"/>
+    <circle cx="500" cy="500" r="375" stroke-width="0.8"/>
+    <path d="M500 500 L840 160" stroke-width="0.7"/>
+    <path d="M500 500 L160 840" stroke-width="0.7"/>
+  </g>
+</svg>

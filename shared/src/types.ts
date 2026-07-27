@@ -35,18 +35,62 @@ export const UPPER_BONUS_POINTS = 35;
 /** Bonus for each Yahtzee after the first 50 is scored (50 + 100 = 150 from that pair). */
 export const YAHTZEE_BONUS_POINTS = 100;
 
+export interface MoveAccuracy {
+  decisions: number;
+  top1: number;
+  top2: number;
+  top3: number;
+}
+
 export interface PlayerPublic {
   id: string;
   name: string;
   isHost: boolean;
+  /** False while the player’s connection is down; seat is kept for rejoin. */
+  connected: boolean;
   sheet: ScoreSheet;
   upperBonus: number;
   /** Extra points from Yahtzee bonuses (100 each after a natural 50). */
   yahtzeeBonus: number;
   total: number;
+  /**
+   * Expected final score from the filled sheet only (ignores current dice),
+   * assuming optimal play for the rest of the game.
+   */
+  estimatedTotal: number;
+}
+
+export interface SeriesRoundPlayer {
+  playerId: string;
+  name: string;
+  total: number;
+  won: boolean;
+  accuracy: MoveAccuracy;
+}
+
+export interface SeriesRound {
+  players: SeriesRoundPlayer[];
+  winners: string[];
+}
+
+export interface SeriesState {
+  rounds: SeriesRound[];
+}
+
+/** Client-persisted credentials to reclaim a seat after drop / refresh. */
+export interface PlayerSession {
+  playerId: string;
+  reconnectToken: string;
+  name: string;
 }
 
 export type RoomPhase = "lobby" | "playing" | "finished";
+
+/** Public Learn panel row (shared with all players after Learn).
+ *  `expected` is estimated final total (scored points + remaining EV). */
+export type LearnHint =
+  | { kind: "hold"; heldFaces: DieValue[]; expected: number }
+  | { kind: "score"; category: Category; expected: number };
 
 export interface TurnState {
   playerId: string;
@@ -56,6 +100,8 @@ export interface TurnState {
   hasRolled: boolean;
   /** After Learn: hold toggles locked until the next roll. */
   holdsFrozen: boolean;
+  /** Top holds shown to everyone after Learn; cleared on next roll. */
+  learnAdvice: LearnHint[] | null;
 }
 
 export interface LeaderboardEntry {
@@ -73,6 +119,7 @@ export interface GameState {
   maxPlayers: number;
   inviteRequired: boolean;
   leaderboard: LeaderboardEntry[];
+  series: SeriesState;
 }
 
 export const CATEGORY_LABELS: Record<Category, string> = {

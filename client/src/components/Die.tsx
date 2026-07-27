@@ -1,12 +1,12 @@
 import type { DieValue } from "@yathze/shared";
 
-const PIP_MAP: Record<DieValue, number[]> = {
-  1: [4],
-  2: [0, 8],
-  3: [0, 4, 8],
-  4: [0, 2, 6, 8],
-  5: [0, 2, 4, 6, 8],
-  6: [0, 2, 3, 5, 6, 8],
+const FACE_SRC: Record<DieValue, string> = {
+  1: "/dice/1.png",
+  2: "/dice/2.png",
+  3: "/dice/3.png",
+  4: "/dice/4.png",
+  5: "/dice/5.png",
+  6: "/dice/6.png",
 };
 
 interface Props {
@@ -24,8 +24,6 @@ export function Die({
   interactive,
   onClick,
 }: Props) {
-  const pips = PIP_MAP[value];
-
   return (
     <button
       type="button"
@@ -38,14 +36,14 @@ export function Die({
       aria-pressed={held}
     >
       <span className="die-face">
-        {revealed
-          ? Array.from({ length: 9 }, (_, i) => (
-              <span
-                key={i}
-                className={`pip ${pips.includes(i) ? "on" : ""}`}
-              />
-            ))
-          : null}
+        {revealed ? (
+          <img
+            className="die-img"
+            src={FACE_SRC[value]}
+            alt=""
+            draggable={false}
+          />
+        ) : null}
       </span>
       {held && <span className="hold-tag">Keep</span>}
     </button>

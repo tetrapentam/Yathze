@@ -2,7 +2,7 @@
   "name": "yathze",
   "private": true,
   "version": "1.0.0",
-  "description": "Stylish LAN multiplayer Yahtzee",
+  "description": "Burian Studio — stylish LAN multiplayer Yahtzee",
   "workspaces": [
     "shared",
     "server",
@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "npm run build -w shared && concurrently -n server,client -c green,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w shared && npm run build -w client && npm run build -w server",
+    "build:opt-table": "npm run build -w shared && node scripts/build-opt-table.mjs",
     "start": "npm run build && npm run start -w server",
     "share": "node scripts/share.mjs",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w client"

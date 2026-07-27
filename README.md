@@ -1,6 +1,6 @@
-# Yathze
+# Burian Studio
 
-Stylish multiplayer Yahtzee. Host on your PC; friends join with a username via your invite link — on the same Wi‑Fi or from anywhere via a private HTTPS link.
+Stylish multiplayer Yahtzee by Burian Studio. Host on your PC; friends join with a username via your invite link — on the same Wi‑Fi or from anywhere via a private HTTPS link.
 
 ## Requirements
 
@@ -39,11 +39,13 @@ Server listens on all interfaces (`0.0.0.0:3000`).
 
 ```bash
 npm install
+npm run build:opt-table   # once: builds Learn EV table (~4 min, ~6MB)
 npm run dev
 ```
 
 - **Game server:** http://localhost:3000  
 - **Vite UI:** http://localhost:5173  
+- **Learn advice** needs `data/OptEScore.bin` (also copied to `client/public/`). Regenerate with `npm run build:opt-table`.
 
 ## How to play
 
@@ -62,8 +64,10 @@ npm run dev
 
 ## Project layout
 
-- `shared/` — types and Yahtzee scoring
+- `shared/` — types, scoring, and full-game optimal EV (`optimal.ts`)
 - `server/` — Express + Socket.IO game room
 - `client/` — React UI
+- `data/OptEScore.bin` — precomputed expected-score table for Learn
 - `sounds/` / `client/public/sounds/` — game SFX
 - `scripts/share.mjs` — build + localhost server + Cloudflare tunnel
+- `scripts/build-opt-table.mjs` — regenerate the Learn EV table

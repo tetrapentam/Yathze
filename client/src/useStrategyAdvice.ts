@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { DieValue, HoldAdvice, ScoreSheet } from "@yathze/shared";
+import type { DieValue, MoveAdvice, ScoreSheet } from "@yathze/shared";
 import type {
   StrategyWorkerRequest,
   StrategyWorkerResponse,
@@ -28,11 +28,11 @@ export function useStrategyAdvice(
   rollsLeft: number,
   enabled: boolean,
 ): {
-  top3: HoldAdvice[] | null;
+  top3: MoveAdvice[] | null;
   ready: boolean;
   token: string | null;
 } {
-  const [top3, setTop3] = useState<HoldAdvice[] | null>(null);
+  const [top3, setTop3] = useState<MoveAdvice[] | null>(null);
   const [ready, setReady] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const reqId = useRef(0);

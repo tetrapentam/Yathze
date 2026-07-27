@@ -1,11 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import type { Category, GameState } from "@yathze/shared";
+import type { Category, GameState, PlayerSession } from "@yathze/shared";
 import { JoinScreen } from "./components/JoinScreen";
 import { LobbyScreen } from "./components/LobbyScreen";
 import { PlayScreen } from "./components/PlayScreen";
 import { ResultsScreen } from "./components/ResultsScreen";
+import { clearSession, loadSession, saveSession } from "./session";
 import { playSound } from "./sounds";
+
+type SocketAck = {
+  ok: boolean;
+  error?: string;
+  inviteCode?: string;
+  playerId?: string;
+  reconnectToken?: string;
+};
 
 function createSocket(): Socket {
   const url =
@@ -31,17 +40,61 @@ export default function App() {
   const [socket] = useState(createSocket);
   const [connected, setConnected] = useState(false);
   const [state, setState] = useState<GameState | null>(null);
-  const [myId, setMyId] = useState<string | null>(null);
+  const [myId, setMyId] = useState<string | null>(() => loadSession()?.playerId ?? null);
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [initialInvite] = useState(readCodeFromUrl);
+  const [rejoining, setRejoining] = useState(() => Boolean(loadSession()));
   const prevState = useRef<GameState | null>(null);
+  const rejoiningRef = useRef(false);
+
+  const applySessionAck = useCallback(
+    (res: SocketAck, nameFallback?: string) => {
+      if (!res.ok || !res.playerId || !res.reconnectToken) return false;
+      const session: PlayerSession = {
+        playerId: res.playerId,
+        reconnectToken: res.reconnectToken,
+        name: nameFallback ?? loadSession()?.name ?? "",
+      };
+      saveSession(session);
+      setMyId(res.playerId);
+      setJoined(true);
+      if (res.inviteCode) setInviteCode(res.inviteCode);
+      setError(null);
+      return true;
+    },
+    [],
+  );
+
+  const tryRejoin = useCallback(() => {
+    const session = loadSession();
+    if (!session || rejoiningRef.current) {
+      if (!session) setRejoining(false);
+      return;
+    }
+    rejoiningRef.current = true;
+    setRejoining(true);
+    socket.emit(
+      "rejoin",
+      { reconnectToken: session.reconnectToken },
+      (res: SocketAck) => {
+        rejoiningRef.current = false;
+        setRejoining(false);
+        if (applySessionAck(res, session.name)) return;
+        clearSession();
+        setJoined(false);
+        setMyId(null);
+        setInviteCode(null);
+        if (res.error) setError(res.error);
+      },
+    );
+  }, [socket, applySessionAck]);
 
   useEffect(() => {
     const onConnect = () => {
       setConnected(true);
-      setMyId(socket.id ?? null);
+      tryRejoin();
     };
     const onDisconnect = () => setConnected(false);
     const onState = (next: GameState) => {
@@ -87,11 +140,7 @@ export default function App() {
       socket.off("disconnect", onDisconnect);
       socket.off("state", onState);
     };
-  }, [socket]);
-
-  useEffect(() => {
-    if (socket.id) setMyId(socket.id);
-  }, [socket.id, connected]);
+  }, [socket, tryRejoin]);
 
   const me = useMemo(
     () => state?.players.find((p) => p.id === myId) ?? null,
@@ -114,18 +163,13 @@ export default function App() {
       socket.emit(
         "join",
         { name, inviteCode: code },
-        (res: { ok: boolean; error?: string; inviteCode?: string }) => {
-          if (res.ok) {
-            setJoined(true);
-            setMyId(socket.id ?? null);
-            if (res.inviteCode) setInviteCode(res.inviteCode);
-          } else {
-            setError(res.error ?? "Could not join.");
-          }
+        (res: SocketAck) => {
+          if (applySessionAck(res, name.trim().slice(0, 16))) return;
+          setError(res.error ?? "Could not join.");
         },
       );
     },
-    [socket],
+    [socket, applySessionAck],
   );
 
   const startGame = useCallback(() => {
@@ -171,13 +215,22 @@ export default function App() {
     });
   }, [socket]);
 
+  const continueSeries = useCallback(() => {
+    socket.emit("continueSeries", (res: { ok: boolean; error?: string }) => {
+      if (!res.ok) setError(res.error ?? "Could not continue.");
+    });
+  }, [socket]);
+
   useEffect(() => {
     if (state && me) setJoined(true);
-    if (state && !me && joined) {
+    if (state && myId && !me && joined && !rejoining) {
+      // Seat was permanently removed (grace expired / table reset).
+      clearSession();
       setJoined(false);
+      setMyId(null);
       setInviteCode(null);
     }
-  }, [state, me, joined]);
+  }, [state, me, joined, myId, rejoining]);
 
   if (!state) {
     return (
@@ -186,6 +239,15 @@ export default function App() {
         <p className="status-text">
           {connected ? "Loading table…" : "Connecting to host…"}
         </p>
+      </div>
+    );
+  }
+
+  if (rejoining) {
+    return (
+      <div className="screen center">
+        <div className="felt-glow" />
+        <p className="status-text">Rejoining your seat…</p>
       </div>
     );
   }
@@ -224,6 +286,8 @@ export default function App() {
         winners={state.winners}
         me={me}
         leaderboard={state.leaderboard}
+        series={state.series}
+        onContinue={continueSeries}
         onReturn={returnToLobby}
       />
     );

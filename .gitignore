@@ -8,3 +8,7 @@ dist/
 tools/cloudflared.exe
 tools/cloudflared
 data/
+!data/OptEScore.bin
+!data/.gitkeep
+library/
+

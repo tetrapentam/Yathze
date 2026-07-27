@@ -32,7 +32,7 @@ export const HAND_COUNT = 252;
 const FACT = [1, 1, 2, 6, 24, 120];
 
 /** All 252 non-decreasing 5-die hands, index = packed id. */
-const ALL_HANDS: DieValue[][] = [];
+export const ALL_HANDS: DieValue[][] = [];
 /** Map "1,2,3,4,5" → hand id 0..251 */
 const HAND_ID_BY_KEY = new Map<string, number>();
 
@@ -155,7 +155,7 @@ export function allHoldMasks(): boolean[][] {
 /**
  * Unique keep actions for this dice layout (one mask per kept-face multiset).
  */
-function uniqueHoldMasks(dice: DieValue[]): { mask: boolean[]; faces: DieValue[]; key: string }[] {
+export function uniqueHoldMasks(dice: DieValue[]): { mask: boolean[]; faces: DieValue[]; key: string }[] {
   const seen = new Map<string, { mask: boolean[]; faces: DieValue[]; key: string }>();
   for (const mask of allHoldMasks()) {
     const faces = heldFacesOf(dice, mask);
@@ -202,7 +202,7 @@ export function forEachRerollOutcome(
  * For a keep mask, visit each distinct resulting multiset with its outcome weight.
  * Weight = number of microstates; weights sum to 6^k (k = free dice).
  */
-function forEachWeightedReroll(
+export function forEachWeightedReroll(
   dice: DieValue[],
   held: boolean[],
   visit: (nextId: number, weight: number) => void,

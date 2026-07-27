@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Build + start Yathze on 127.0.0.1 and expose it via a Cloudflare quick tunnel.
+ * Build + start Burian Studio on 127.0.0.1 and expose it via a Cloudflare quick tunnel.
  * Prints a one-time HTTPS invite link. No router ports are opened.
  */
 import { spawn, execSync } from "node:child_process";
@@ -55,7 +55,7 @@ if (!cloudflared) {
   );
 }
 
-console.log("Building Yathze…");
+console.log("Building Burian Studio…");
 try {
   execSync("npm run build", { cwd: root, stdio: "inherit", shell: true });
 } catch {
@@ -107,7 +107,8 @@ function watchServer(stream) {
   const rl = createInterface({ input: stream });
   rl.on("line", (line) => {
     process.stdout.write(`${line}\n`);
-    const m = line.match(/YATHZE_INVITE_CODE=([A-Z0-9]+)/i);
+    const m = line.match(/BURIAN_INVITE_CODE=([A-Z0-9]+)/i) ??
+      line.match(/YATHZE_INVITE_CODE=([A-Z0-9]+)/i);
     if (m) {
       inviteCode = m[1].toUpperCase();
       tryPrintLink();

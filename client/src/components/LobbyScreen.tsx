@@ -74,7 +74,7 @@ export function LobbyScreen({
     <div className="screen lobby-screen">
       <div className="felt-glow" />
       <header className="panel-header">
-        <h1 className="brand brand-sm">Yathze</h1>
+        <h1 className="brand brand-sm">Burian Studio</h1>
         <p className="tagline">
           {me.isHost
             ? alone
@@ -120,13 +120,16 @@ export function LobbyScreen({
             {players.map((p, i) => (
               <li
                 key={p.id}
-                className={`player-chip ${p.id === me.id ? "you" : ""}`}
+                className={`player-chip ${p.id === me.id ? "you" : ""} ${
+                  p.connected ? "" : "away"
+                }`}
                 style={{ animationDelay: `${i * 80}ms` }}
               >
                 <span className="seat">{i + 1}</span>
                 <span className="pname">{p.name}</span>
                 {p.isHost && <span className="badge">Host</span>}
                 {p.id === me.id && <span className="badge you-badge">You</span>}
+                {!p.connected && <span className="badge away-badge">Away</span>}
               </li>
             ))}
           </ul>

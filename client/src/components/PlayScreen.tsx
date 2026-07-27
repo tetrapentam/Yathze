@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ALL_CATEGORIES,
   canScoreInCategory,
@@ -6,7 +6,7 @@ import {
   upperSubtotal,
   type Category,
   type GameState,
-  type HoldAdvice,
+  type LearnHint,
   type PlayerPublic,
 } from "@yathze/shared";
 import { mergeLiveLeaderboard } from "../leaderboardLive";
@@ -29,9 +29,19 @@ function rollToken(turn: NonNullable<GameState["turn"]>): string {
   return `${turn.playerId}:${turn.rollsLeft}:${turn.hasRolled}:${turn.dice.join(",")}`;
 }
 
-function formatHold(advice: HoldAdvice): string {
+function formatAdvice(advice: LearnHint): string {
+  if (advice.kind === "score") {
+    return `Score ${formatCategory(advice.category)}`;
+  }
   if (advice.heldFaces.length === 0) return "Reroll all";
   return `Keep ${advice.heldFaces.join(", ")}`;
+}
+
+function formatCategory(category: Category): string {
+  return category
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
 }
 
 export function PlayScreen({
@@ -49,39 +59,27 @@ export function PlayScreen({
   const token = rollToken(turn);
   const [settledToken, setSettledToken] = useState(token);
   const [diceRolling, setDiceRolling] = useState(false);
-  const [learnVisible, setLearnVisible] = useState(false);
-  const [shownAdvice, setShownAdvice] = useState<HoldAdvice[] | null>(null);
 
   const diceSettled = !diceRolling && settledToken === token;
   const showSuggestions =
     turn.hasRolled && diceSettled && active !== undefined;
 
   const adviceEnabled =
-    isMyTurn && turn.hasRolled && turn.rollsLeft > 0 && active !== undefined;
+    isMyTurn &&
+    turn.hasRolled &&
+    turn.rollsLeft > 0 &&
+    !turn.holdsFrozen &&
+    active !== undefined;
 
-  const { top3, ready: learnReady } = useStrategyAdvice(
+  const { ready: learnReady } = useStrategyAdvice(
     adviceEnabled ? turn.dice : null,
     adviceEnabled && active ? active.sheet : null,
     turn.rollsLeft,
     adviceEnabled,
   );
 
-  useEffect(() => {
-    setLearnVisible(false);
-    setShownAdvice(null);
-  }, [token]);
-
-  useEffect(() => {
-    if (turn.holdsFrozen && top3 && top3.length > 0 && isMyTurn) {
-      setShownAdvice(top3);
-      setLearnVisible(true);
-      return;
-    }
-    if (!turn.holdsFrozen) {
-      setLearnVisible(false);
-      setShownAdvice(null);
-    }
-  }, [turn.holdsFrozen, top3, isMyTurn]);
+  const learnAdvice = turn.learnAdvice;
+  const showLearnPanel = Boolean(learnAdvice && learnAdvice.length > 0);
 
   const suggestions = useMemo(() => {
     if (!showSuggestions || !active) return {};
@@ -114,10 +112,14 @@ export function PlayScreen({
     <div className="screen play-screen">
       <div className="felt-glow" />
       <header className="play-header">
-        <h1 className="brand brand-sm">Yathze</h1>
+        <h1 className="brand brand-sm">Burian Studio</h1>
         <div className={`turn-banner ${isMyTurn ? "yours" : ""}`}>
           {isMyTurn ? (
             <span>Your turn</span>
+          ) : active && !active.connected ? (
+            <span>
+              Waiting for <strong>{active.name}</strong> to rejoin…
+            </span>
           ) : (
             <span>
               <strong>{active?.name ?? "…"}</strong> is rolling
@@ -138,10 +140,16 @@ export function PlayScreen({
                 key={p.id}
                 className={`roster-item ${p.id === turn.playerId ? "active" : ""} ${
                   p.id === me.id ? "you" : ""
-                }`}
+                } ${p.connected ? "" : "away"}`}
               >
-                <span className="rname">{p.name}</span>
+                <span className="rname">
+                  {p.name}
+                  {!p.connected ? " (away)" : ""}
+                </span>
                 <span className="rtotal">{p.total} pts</span>
+                <span className="rest" title="Estimated final total (optimal play)">
+                  est {Math.round(p.estimatedTotal)}
+                </span>
               </div>
             ))}
           </div>
@@ -154,22 +162,22 @@ export function PlayScreen({
             holdsFrozen={Boolean(turn.holdsFrozen)}
             interactive={isMyTurn}
             learnReady={learnReady}
-            learnOpen={learnVisible || Boolean(turn.holdsFrozen)}
+            learnOpen={showLearnPanel || Boolean(turn.holdsFrozen)}
             onHold={onHold}
             onRoll={onRoll}
             onLearn={onLearn}
             onRollingChange={handleRollingChange}
           />
 
-          {learnVisible && shownAdvice && shownAdvice.length > 0 && (
+          {showLearnPanel && learnAdvice && (
             <div className="learn-panel" aria-live="polite">
-              <p className="learn-title">Best holds (expected points)</p>
+              <p className="learn-title">Best moves (estimated total)</p>
               <ol className="learn-list">
-                {shownAdvice.map((advice, i) => (
-                  <li key={`${formatHold(advice)}-${i}`}>
-                    <span className="learn-move">{formatHold(advice)}</span>
+                {learnAdvice.map((advice, i) => (
+                  <li key={`${formatAdvice(advice)}-${i}`}>
+                    <span className="learn-move">{formatAdvice(advice)}</span>
                     <span className="learn-ev">
-                      EV {advice.expected.toFixed(1)}
+                      {advice.expected.toFixed(1)} pts
                     </span>
                   </li>
                 ))}

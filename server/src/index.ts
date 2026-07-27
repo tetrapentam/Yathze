@@ -6,6 +6,9 @@ import { createServer } from "node:http";
 import { Server } from "socket.io";
 import type { Category } from "@yathze/shared";
 import { GameRoom } from "./game.js";
+import { ensureOptTableLoaded } from "./optTable.js";
+
+ensureOptTableLoaded();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -32,7 +35,15 @@ function broadcast(): void {
   io.emit("state", room.getState());
 }
 
-type Ack = (r: { ok: boolean; error?: string; inviteCode?: string }) => void;
+room.setChangeListener(broadcast);
+
+type Ack = (r: {
+  ok: boolean;
+  error?: string;
+  inviteCode?: string;
+  playerId?: string;
+  reconnectToken?: string;
+}) => void;
 
 io.on("connection", (socket) => {
   socket.emit("state", room.getState());
@@ -52,6 +63,26 @@ io.on("connection", (socket) => {
         broadcast();
         ack?.({
           ok: true,
+          playerId: result.playerId,
+          reconnectToken: result.reconnectToken,
+          ...(result.inviteCode ? { inviteCode: result.inviteCode } : {}),
+        });
+      } else {
+        ack?.({ ok: false, error: result.error });
+      }
+    },
+  );
+
+  socket.on(
+    "rejoin",
+    (payload: { reconnectToken?: string }, ack?: Ack) => {
+      const result = room.rejoin(socket.id, payload?.reconnectToken ?? "");
+      if (result.ok) {
+        broadcast();
+        ack?.({
+          ok: true,
+          playerId: result.playerId,
+          reconnectToken: result.reconnectToken,
           ...(result.inviteCode ? { inviteCode: result.inviteCode } : {}),
         });
       } else {
@@ -126,15 +157,25 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("continueSeries", (ack?: Ack) => {
+    const result = room.continueSeries(socket.id);
+    if (result.ok) {
+      broadcast();
+      ack?.({ ok: true });
+    } else {
+      ack?.({ ok: false, error: result.error });
+    }
+  });
+
   socket.on("disconnect", () => {
-    room.leave(socket.id);
+    room.disconnect(socket.id);
     broadcast();
   });
 });
 
 httpServer.listen(PORT, HOST, () => {
   console.log("");
-  console.log("Yathze server is ready.");
+  console.log("Burian Studio server is ready.");
   console.log(`  Bound:  http://${HOST}:${PORT}`);
   console.log(`  Local:  http://localhost:${PORT}`);
   if (HOST === "0.0.0.0") {
@@ -142,7 +183,7 @@ httpServer.listen(PORT, HOST, () => {
   } else {
     console.log("  Share mode: only reachable via tunnel or localhost.");
   }
-  console.log(`YATHZE_INVITE_CODE=${room.getInviteCode()}`);
+  console.log(`BURIAN_INVITE_CODE=${room.getInviteCode()}`);
   console.log("Leave this window open while you play.");
   console.log("");
 });
