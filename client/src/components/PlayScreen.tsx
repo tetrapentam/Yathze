@@ -186,26 +186,28 @@ export function PlayScreen({
           )}
 
           <div className="sheets-row">
-            {state.players.map((p) => {
-              const isActive = p.id === turn.playerId;
-              const canScore = isMyTurn && isActive && showSuggestions;
-              return (
-                <ScoreSheet
-                  key={p.id}
-                  title={p.id === me.id ? `${p.name} (you)` : p.name}
-                  sheet={p.sheet}
-                  upperBonus={p.upperBonus}
-                  upperSub={upperSubtotal(p.sheet)}
-                  yahtzeeBonus={p.yahtzeeBonus}
-                  total={p.total}
-                  suggestions={isActive && showSuggestions ? suggestions : {}}
-                  eligible={isActive && showSuggestions ? eligible : null}
-                  canScore={canScore}
-                  onScore={onScore}
-                  highlight={isActive}
-                />
-              );
-            })}
+            {[...state.players]
+              .sort((a, b) => Number(b.id === me.id) - Number(a.id === me.id))
+              .map((p) => {
+                const isActive = p.id === turn.playerId;
+                const canScore = isMyTurn && isActive && showSuggestions;
+                return (
+                  <ScoreSheet
+                    key={p.id}
+                    title={p.id === me.id ? `${p.name} (you)` : p.name}
+                    sheet={p.sheet}
+                    upperBonus={p.upperBonus}
+                    upperSub={upperSubtotal(p.sheet)}
+                    yahtzeeBonus={p.yahtzeeBonus}
+                    total={p.total}
+                    suggestions={isActive && showSuggestions ? suggestions : {}}
+                    eligible={isActive && showSuggestions ? eligible : null}
+                    canScore={canScore}
+                    onScore={onScore}
+                    highlight={isActive}
+                  />
+                );
+              })}
           </div>
 
           {error && <p className="banner error">{error}</p>}

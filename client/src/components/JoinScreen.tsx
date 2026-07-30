@@ -33,6 +33,10 @@ export function JoinScreen({
   const blocked = phase !== "lobby";
   const canSubmit =
     name.trim().length > 0 && (!needsCodeInput || inviteCode.trim().length > 0);
+  // Autofocus opens the keyboard on phones and often covers Join — skip on touch.
+  const preferAutofocus =
+    typeof window !== "undefined" &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
   return (
     <div className="screen join-screen">
@@ -58,7 +62,7 @@ export function JoinScreen({
             <label htmlFor="username">Your name</label>
             <input
               id="username"
-              autoFocus
+              autoFocus={preferAutofocus}
               maxLength={16}
               placeholder="Enter username"
               value={name}
